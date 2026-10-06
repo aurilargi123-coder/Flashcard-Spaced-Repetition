@@ -1,0 +1,3068 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlashMind — Flashcard & Spaced Repetition</title>
+  <!-- Supabase JS SDK v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Chart.js v4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    /* ==========================================================================
+       CSS VARIABLES & THEMES
+       ========================================================================== */
+    :root {
+      --bg-primary: #0f111a;
+      --bg-secondary: #171926;
+      --bg-tertiary: #212438;
+      --bg-card: #1c1e30;
+      --bg-hover: #292d47;
+      --bg-input: #151724;
+      --text-primary: #f1f3f9;
+      --text-secondary: #9da4c0;
+      --text-muted: #6e7594;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.28);
+      --accent-subtle: rgba(99, 102, 241, 0.12);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.14);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.14);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.14);
+      --info: #06b6d4;
+      --info-bg: rgba(6, 182, 212, 0.14);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.18);
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      --shadow-lg: 0 10px 35px rgba(0, 0, 0, 0.5);
+      --radius-sm: 6px;
+      --radius: 12px;
+      --radius-lg: 18px;
+      --sidebar-width: 260px;
+      --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #f1f5f9;
+      --bg-card: #ffffff;
+      --bg-hover: #f1f5f9;
+      --bg-input: #f8fafc;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border: rgba(0, 0, 0, 0.08);
+      --border-hover: rgba(0, 0, 0, 0.16);
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.09);
+      --accent-subtle: rgba(99, 102, 241, 0.08);
+      --accent-glow: rgba(99, 102, 241, 0.18);
+    }
+
+    /* Base Reset */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background var(--transition), color var(--transition);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; border: none; outline: none; }
+    input, textarea, select { font-family: inherit; outline: none; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+
+    /* Utilities */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-2 { gap: 8px; }
+    .gap-3 { gap: 12px; }
+    .gap-4 { gap: 16px; }
+    .mb-1 { margin-bottom: 4px; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-3 { margin-bottom: 12px; }
+    .mb-4 { margin-bottom: 16px; }
+    .mt-2 { margin-top: 8px; }
+    .mt-4 { margin-top: 16px; }
+
+    /* Button styles */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 0.92rem;
+      font-weight: 600;
+      transition: all var(--transition);
+      user-select: none;
+    }
+    .btn-accent {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-accent:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 4px 16px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+    .btn-ghost {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-hover);
+    }
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+    .btn-danger:hover {
+      background: #dc2626;
+      box-shadow: 0 4px 16px var(--danger-bg);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* ==========================================================================
+       AUTH SCREEN
+       ========================================================================== */
+    .auth-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(circle at top, var(--bg-secondary) 0%, var(--bg-primary) 70%);
+    }
+    .auth-box {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px 32px;
+      box-shadow: var(--shadow-lg);
+    }
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .auth-logo .logo-icon {
+      width: 58px;
+      height: 58px;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      margin-bottom: 14px;
+      box-shadow: 0 8px 24px var(--accent-glow);
+    }
+    .auth-logo h1 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff, #c7d2fe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    [data-theme="light"] .auth-logo h1 {
+      background: linear-gradient(135deg, #1e1b4b, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .auth-logo p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-top: 6px;
+    }
+    .auth-tabs {
+      display: flex;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      margin-bottom: 22px;
+      gap: 4px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 9px;
+      text-align: center;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: transparent;
+      transition: all var(--transition);
+    }
+    .auth-tab.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      transition: all var(--transition);
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .auth-error {
+      display: none;
+      padding: 10px 14px;
+      background: var(--danger-bg);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius-sm);
+      color: #fca5a5;
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+    }
+    .auth-success {
+      display: none;
+      padding: 10px 14px;
+      background: var(--success-bg);
+      border: 1px solid var(--success);
+      border-radius: var(--radius-sm);
+      color: #86efac;
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+    }
+
+    /* ==========================================================================
+       APP LAYOUT & NAVIGATION
+       ========================================================================== */
+    .app-layout {
+      display: none;
+      min-height: 100vh;
+    }
+    .app-layout.active {
+      display: flex;
+    }
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      z-index: 50;
+      transition: transform var(--transition);
+    }
+    .sidebar-header {
+      padding: 24px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-header .s-logo {
+      font-size: 24px;
+      width: 40px;
+      height: 40px;
+      background: var(--accent-subtle);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sidebar-header .s-brand {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .sidebar-nav {
+      flex: 1;
+      padding: 16px 12px;
+      overflow-y: auto;
+    }
+    .nav-section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 10px 12px 6px;
+    }
+    .nav-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      background: transparent;
+      font-size: 0.92rem;
+      font-weight: 600;
+      text-align: left;
+      margin-bottom: 4px;
+      transition: all var(--transition);
+    }
+    .nav-item:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    .nav-item.active {
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border-left: 3px solid var(--accent);
+    }
+    .nav-item .nav-badge {
+      margin-left: auto;
+      background: var(--warning);
+      color: #000;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 6px;
+      border-radius: var(--radius-sm);
+    }
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .user-details {
+      overflow: hidden;
+    }
+    .user-email {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .user-badge {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .sidebar-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .sidebar-actions button {
+      flex: 1;
+      padding: 7px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      transition: all var(--transition);
+    }
+    .sidebar-actions button:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    .mobile-toggle {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      box-shadow: var(--shadow-lg);
+      font-size: 22px;
+      z-index: 99;
+      align-items: center;
+      justify-content: center;
+    }
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 40;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      min-width: 0;
+      padding: 32px 40px;
+      overflow-y: auto;
+      max-width: 1200px;
+    }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .page-header h2 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .page-header p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 4px;
+    }
+
+    /* ==========================================================================
+       DASHBOARD METRICS & DECKS
+       ========================================================================== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition), border-color var(--transition);
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-hover);
+    }
+    .stat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    .stat-value {
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.1;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    /* Decks Grid */
+    .decks-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .deck-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+      transition: all var(--transition);
+    }
+    .deck-card:hover {
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-3px);
+    }
+    .deck-color-bar {
+      height: 6px;
+      width: 100%;
+    }
+    .deck-card-body {
+      padding: 22px;
+      flex: 1;
+      cursor: pointer;
+    }
+    .deck-card-body h3 {
+      font-size: 1.18rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .deck-desc {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .deck-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .deck-actions-row {
+      display: flex;
+      border-top: 1px solid var(--border);
+      background: var(--bg-tertiary);
+    }
+    .deck-actions-row button {
+      flex: 1;
+      padding: 11px 8px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-right: 1px solid var(--border);
+      transition: all var(--transition);
+    }
+    .deck-actions-row button:last-child {
+      border-right: none;
+    }
+    .deck-actions-row button:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      background: var(--bg-card);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      grid-column: 1 / -1;
+    }
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.8;
+    }
+    .empty-state h3 {
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+    }
+    .empty-state p {
+      color: var(--text-secondary);
+      max-width: 440px;
+      margin: 0 auto 18px;
+      font-size: 0.92rem;
+    }
+
+    /* ==========================================================================
+       DECK DETAIL & CARD TABLE
+       ========================================================================== */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      background: transparent;
+      transition: color var(--transition);
+    }
+    .back-btn:hover {
+      color: var(--accent);
+    }
+    .card-table {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .card-table-header {
+      display: grid;
+      grid-template-columns: 2fr 2fr 110px 100px;
+      padding: 14px 20px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .card-row {
+      display: grid;
+      grid-template-columns: 2fr 2fr 110px 100px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      font-size: 0.92rem;
+      transition: background var(--transition);
+    }
+    .card-row:last-child {
+      border-bottom: none;
+    }
+    .card-row:hover {
+      background: var(--bg-hover);
+    }
+    .card-status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .status-new { background: var(--info-bg); color: var(--info); }
+    .status-review { background: var(--warning-bg); color: var(--warning); }
+    .status-learning { background: var(--success-bg); color: var(--success); }
+    .card-row-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .card-row-actions button {
+      padding: 6px 9px;
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      transition: all var(--transition);
+    }
+    .card-row-actions button:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    .card-row-actions button.del:hover {
+      background: var(--danger-bg);
+      color: var(--danger);
+    }
+
+    /* ==========================================================================
+       STUDY MODE (FLASHCARD & SM-2)
+       ========================================================================== */
+    .study-container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .study-progress {
+      margin-bottom: 24px;
+    }
+    .study-progress-bar {
+      height: 8px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .study-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #a855f7);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .study-progress-text {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    /* 3D Flip Card */
+    .flashcard-wrapper {
+      perspective: 1200px;
+      margin-bottom: 28px;
+      min-height: 320px;
+    }
+    .flashcard {
+      width: 100%;
+      min-height: 320px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      user-select: none;
+    }
+    .flashcard.flipped {
+      transform: rotateY(180deg);
+    }
+    .flashcard-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: var(--shadow-lg);
+      transition: border-color var(--transition);
+    }
+    .flashcard:hover .flashcard-face {
+      border-color: var(--accent);
+    }
+    .flashcard-back {
+      transform: rotateY(180deg);
+      background: linear-gradient(145deg, var(--bg-card), var(--bg-tertiary));
+    }
+    .face-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .card-text {
+      font-size: 1.35rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+      text-align: center;
+      margin: auto 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .flip-hint {
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    /* Rating buttons */
+    .rating-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .rating-btn {
+      padding: 16px 12px;
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: #fff;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+      transition: all var(--transition);
+    }
+    .rating-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+    .rating-btn .rating-label {
+      font-size: 1.05rem;
+    }
+    .rating-btn .rating-interval {
+      font-size: 0.75rem;
+      opacity: 0.85;
+      font-weight: 500;
+    }
+    .rating-btn.again { background: #ef4444; }
+    .rating-btn.again:hover { background: #dc2626; box-shadow: 0 4px 18px rgba(239, 68, 68, 0.4); }
+    .rating-btn.hard { background: #f59e0b; }
+    .rating-btn.hard:hover { background: #d97706; box-shadow: 0 4px 18px rgba(245, 158, 11, 0.4); }
+    .rating-btn.good { background: #10b981; }
+    .rating-btn.good:hover { background: #059669; box-shadow: 0 4px 18px rgba(16, 185, 129, 0.4); }
+    .rating-btn.easy { background: #3b82f6; }
+    .rating-btn.easy:hover { background: #2563eb; box-shadow: 0 4px 18px rgba(59, 130, 246, 0.4); }
+
+    .study-shortcuts {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    /* Study complete summary */
+    .study-complete-card {
+      text-align: center;
+      padding: 48px 32px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+    }
+    .study-complete-icon {
+      font-size: 56px;
+      margin-bottom: 18px;
+    }
+    .summary-stats {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin: 28px 0;
+    }
+    .summary-item .num {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+    .summary-item .lbl {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ==========================================================================
+       STATISTICS & RETENTION
+       ========================================================================== */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }
+    .chart-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+    .chart-container {
+      position: relative;
+      height: 240px;
+    }
+
+    /* Heatmap */
+    .heatmap-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: repeat(52, 1fr);
+      grid-template-rows: repeat(7, 1fr);
+      gap: 4px;
+      overflow-x: auto;
+      padding: 8px 0;
+    }
+    .heatmap-cell {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: var(--bg-tertiary);
+      transition: transform 0.15s;
+    }
+    .heatmap-cell:hover {
+      transform: scale(1.4);
+      z-index: 10;
+    }
+    .heatmap-cell[data-level="0"] { background: var(--bg-tertiary); }
+    .heatmap-cell[data-level="1"] { background: rgba(99, 102, 241, 0.35); }
+    .heatmap-cell[data-level="2"] { background: rgba(99, 102, 241, 0.60); }
+    .heatmap-cell[data-level="3"] { background: rgba(99, 102, 241, 0.85); }
+    .heatmap-cell[data-level="4"] { background: #6366f1; }
+
+    /* ==========================================================================
+       SETUP GUIDE & CODE BLOCKS
+       ========================================================================== */
+    .guide-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+    .guide-card h3 {
+      font-size: 1.15rem;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .code-block {
+      background: #0b0d14;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: var(--radius-sm);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.88rem;
+      overflow-x: auto;
+      line-height: 1.5;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      transition: all var(--transition);
+    }
+    .copy-btn:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ==========================================================================
+       MODALS & TOASTS
+       ========================================================================== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal {
+      width: 100%;
+      max-width: 500px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      animation: modalIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+    .modal-close {
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 20px;
+      padding: 4px;
+      transition: color var(--transition);
+    }
+    .modal-close:hover { color: var(--text-primary); }
+    .modal-body {
+      padding: 24px;
+    }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      background: var(--bg-tertiary);
+    }
+
+    /* Color picker in deck modal */
+    .color-options {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .color-option {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform var(--transition);
+    }
+    .color-option:hover { transform: scale(1.15); }
+    .color-option.selected {
+      border-color: #ffffff;
+      transform: scale(1.15);
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+      animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--danger); }
+    .toast.info { border-color: var(--info); }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .sidebar-overlay.open {
+        display: block;
+      }
+      .mobile-toggle {
+        display: flex;
+      }
+      .main-content {
+        padding: 24px 18px;
+      }
+      .card-table-header, .card-row {
+        grid-template-columns: 1fr 1fr 90px;
+      }
+      .card-table-header div:nth-child(2), .card-row div:nth-child(2) {
+        display: none;
+      }
+      .rating-buttons {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       AUTH SCREEN
+       ========================================================================== -->
+  <div id="authPage" class="auth-container">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <div class="logo-icon">🧠</div>
+        <h1>FlashMind</h1>
+        <p>Aplikasi Flashcard & Spaced Repetition untuk Mahasiswa</p>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Masuk</button>
+        <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Daftar Akun</button>
+      </div>
+
+      <div id="authError" class="auth-error"></div>
+      <div id="authSuccess" class="auth-success"></div>
+
+      <form id="authForm" onsubmit="handleAuth(event)">
+        <div class="form-group">
+          <label for="authEmail">Email</label>
+          <input type="email" id="authEmail" required placeholder="mahasiswa@kampus.ac.id">
+        </div>
+        <div class="form-group">
+          <label for="authPassword">Password</label>
+          <input type="password" id="authPassword" required minlength="6" placeholder="Minimal 6 karakter">
+        </div>
+        <button type="submit" class="btn btn-accent" id="authSubmitBtn" style="width:100%; padding:12px; margin-top:6px;">Masuk</button>
+      </form>
+
+      <div style="margin-top:20px; padding-top:18px; border-top:1px solid var(--border); text-align:center;">
+        <button type="button" class="btn btn-ghost" style="width:100%; border:1px dashed var(--accent); color:var(--accent);" onclick="loginAsDemo()">
+          ⚡ Masuk Cepat Mode Demo (Tamu / Uji Coba)
+        </button>
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-top:8px;">
+          Mode demo menyediakan data sampel siap uji tanpa perlu konfigurasi Supabase awal.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MAIN APP LAYOUT
+       ========================================================================== -->
+  <button class="mobile-toggle" onclick="toggleSidebar()" aria-label="Toggle Menu">☰</button>
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+  <div id="appLayout" class="app-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="s-logo">🧠</div>
+        <span class="s-brand">FlashMind</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Navigasi Utama</div>
+        <button class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+          <span>📊</span> Dashboard
+          <span class="nav-badge" id="dueBadge" style="display:none">0</span>
+        </button>
+        <button class="nav-item" data-page="statistics" onclick="navigateTo('statistics')">
+          <span>📈</span> Statistik Retensi
+        </button>
+        <button class="nav-item" data-page="setup" onclick="navigateTo('setup')">
+          <span>⚙️</span> Setup & Supabase
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">M</div>
+          <div class="user-details">
+            <div class="user-email" id="userEmail">mahasiswa@demo.com</div>
+            <div class="user-badge" id="userModeBadge">Mode Demo (Offline)</div>
+          </div>
+        </div>
+        <div class="sidebar-actions">
+          <button onclick="toggleTheme()">🌓 Tema</button>
+          <button onclick="handleLogout()">🚪 Keluar</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN PAGE CONTAINER -->
+    <main class="main-content">
+
+      <!-- ========================================
+           PAGE 1: DASHBOARD
+           ======================================== -->
+      <section id="page-dashboard" class="page-view">
+        <div class="page-header">
+          <div>
+            <h2>Dashboard Belajar</h2>
+            <p>Kelola dek, pelajari kartu hari ini, dan pantau retensi memori Anda.</p>
+          </div>
+          <button class="btn btn-accent" onclick="openDeckModal()">➕ Buat Dek Baru</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--accent-subtle); color:var(--accent);">📚</div>
+            <div class="stat-value" id="statTotalDecks">0</div>
+            <div class="stat-label">Total Dek Belajar</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--info-bg); color:var(--info);">🃏</div>
+            <div class="stat-value" id="statTotalCards">0</div>
+            <div class="stat-label">Total Kartu Flashcard</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--warning-bg); color:var(--warning);">⏰</div>
+            <div class="stat-value" id="statDueCards">0</div>
+            <div class="stat-label">Perlu Di-Review Hari Ini</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--success-bg); color:var(--success);">✅</div>
+            <div class="stat-value" id="statReviewedToday">0</div>
+            <div class="stat-label">Review Selesai Hari Ini</div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-3">
+          <h3 style="font-size:1.25rem; font-weight:700;">Dek Belajar Anda</h3>
+        </div>
+        <div id="decksList" class="decks-list"></div>
+      </section>
+
+      <!-- ========================================
+           PAGE 2: DECK DETAIL
+           ======================================== -->
+      <section id="page-deck-detail" class="page-view hidden">
+        <button class="back-btn" onclick="navigateTo('dashboard')">← Kembali ke Dashboard</button>
+        <div class="page-header">
+          <div>
+            <h2 id="deckDetailTitle">Judul Dek</h2>
+            <p id="deckDetailDesc">Deskripsi materi pelajaran dek ini.</p>
+          </div>
+          <div class="flex gap-2" style="flex-wrap:wrap;">
+            <button class="btn btn-accent" id="startStudyBtn" onclick="startStudy(false)">▶ Mulai Review</button>
+            <button class="btn btn-ghost" id="startPracticeBtn" onclick="startStudy(true)">🔄 Mode Latihan Bebas</button>
+            <button class="btn btn-ghost" onclick="openCardModal()">➕ Tambah Kartu</button>
+          </div>
+        </div>
+        <div id="cardTable"></div>
+      </section>
+
+      <!-- ========================================
+           PAGE 3: STUDY / REVIEW MODE
+           ======================================== -->
+      <section id="page-study" class="page-view hidden">
+        <button class="back-btn" onclick="exitStudy()">← Keluar dari Sesi Belajar</button>
+
+        <div class="study-container" id="studyArea">
+          <div class="study-progress">
+            <div class="study-progress-bar">
+              <div class="study-progress-fill" id="studyProgressFill" style="width:0%"></div>
+            </div>
+            <div class="study-progress-text">
+              <span id="studyProgressText">Kartu 0 / 0</span>
+              <span id="studyDeckName">Nama Dek</span>
+            </div>
+          </div>
+
+          <!-- Flashcard with 3D Flip -->
+          <div class="flashcard-wrapper">
+            <div class="flashcard" id="flashcard" onclick="flipCard()">
+              <div class="flashcard-face flashcard-front">
+                <span class="face-label">Pertanyaan (Klik kartu / Spasi untuk membalik)</span>
+                <div class="card-text" id="cardFront">—</div>
+                <span class="flip-hint">🔄 Klik untuk melihat jawaban</span>
+              </div>
+              <div class="flashcard-face flashcard-back">
+                <span class="face-label">Jawaban & Penjelasan</span>
+                <div class="card-text" id="cardBack">—</div>
+                <span class="flip-hint">Pilih seberapa mudah Anda mengingatnya di bawah</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rating Buttons (Quality 1-5 SM-2) -->
+          <div class="rating-buttons" id="ratingButtons" style="display:none;">
+            <button class="rating-btn again" onclick="rateCard(1)">
+              <span class="rating-label">Lagi (1)</span>
+              <span class="rating-interval">Reset 1 hari</span>
+            </button>
+            <button class="rating-btn hard" onclick="rateCard(3)">
+              <span class="rating-label">Sulit (2)</span>
+              <span class="rating-interval" id="intervalHard">—</span>
+            </button>
+            <button class="rating-btn good" onclick="rateCard(4)">
+              <span class="rating-label">Baik (3)</span>
+              <span class="rating-interval" id="intervalGood">—</span>
+            </button>
+            <button class="rating-btn easy" onclick="rateCard(5)">
+              <span class="rating-label">Mudah (4)</span>
+              <span class="rating-interval" id="intervalEasy">—</span>
+            </button>
+          </div>
+
+          <div class="study-shortcuts">
+            Pintasan Keyboard: <strong>Spasi</strong> untuk membalik kartu • Tekan angka <strong>1 - 4</strong> untuk memilih tingkat kesulitan.
+          </div>
+        </div>
+
+        <!-- Study Complete Summary -->
+        <div class="study-container hidden" id="studyComplete">
+          <div class="study-complete-card">
+            <div class="study-complete-icon">🎉</div>
+            <h3 style="font-size:1.6rem; font-weight:800; margin-bottom:8px;">Sesi Belajar Selesai!</h3>
+            <p style="color:var(--text-secondary);">Bagus sekali! Pengulangan berkala telah memperkuat retensi memori jangka panjang Anda.</p>
+            
+            <div class="summary-stats">
+              <div class="summary-item">
+                <div class="num" id="summaryTotal">0</div>
+                <div class="lbl">Total Kartu</div>
+              </div>
+              <div class="summary-item">
+                <div class="num" style="color:var(--success);" id="summaryCorrect">0</div>
+                <div class="lbl">Ingat (Baik/Mudah)</div>
+              </div>
+              <div class="summary-item">
+                <div class="num" style="color:var(--danger);" id="summaryWrong">0</div>
+                <div class="lbl">Perlu Pengulangan</div>
+              </div>
+            </div>
+
+            <div class="flex gap-2 justify-between" style="max-width:320px; margin:0 auto;">
+              <button class="btn btn-ghost" style="flex:1;" onclick="exitStudy()">Ke Dek</button>
+              <button class="btn btn-accent" style="flex:1;" onclick="startStudy(true)">Latihan Lagi</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================
+           PAGE 4: RETENTION STATISTICS
+           ======================================== -->
+      <section id="page-statistics" class="page-view hidden">
+        <div class="page-header">
+          <div>
+            <h2>Statistik Retensi Memori</h2>
+            <p>Analisis efektivitas memori jangka panjang berdasarkan algoritma Spaced Repetition (SM-2).</p>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--success-bg); color:var(--success);">🎯</div>
+            <div class="stat-value" id="statRetention">0%</div>
+            <div class="stat-label">Tingkat Retensi Sukses</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--accent-subtle); color:var(--accent);">🔥</div>
+            <div class="stat-value" id="statStreak">0 hari</div>
+            <div class="stat-label">Streak Belajar Aktif</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--info-bg); color:var(--info);">📊</div>
+            <div class="stat-value" id="statTotalReviews">0</div>
+            <div class="stat-label">Total Sesi Review</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--warning-bg); color:var(--warning);">⚡</div>
+            <div class="stat-value" id="statAvgPerDay">0</div>
+            <div class="stat-label">Rata-rata Review/Hari</div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <h3>📈 Aktivitas Review Harian (7 Hari Terakhir)</h3>
+            <div class="chart-container">
+              <canvas id="chartReviewsDaily"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <h3>🎯 Distribusi Kualitas Jawaban</h3>
+            <div class="chart-container">
+              <canvas id="chartQuality"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-card mb-4">
+          <h3>🧠 Tingkat Penguasaan Kartu (Memory Maturity Stages)</h3>
+          <div class="chart-container" style="height:140px;">
+            <canvas id="chartLearned"></canvas>
+          </div>
+        </div>
+
+        <div class="heatmap-section">
+          <div class="flex items-center justify-between mb-2">
+            <h3 style="font-size:1.05rem; font-weight:700;">📅 Heatmap Aktivitas Belajar (1 Tahun)</h3>
+            <span style="font-size:0.8rem; color:var(--text-muted);">Sedikit ▫️ ◽ ◻️ ⬛ Banyak</span>
+          </div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+        </div>
+
+        <div class="chart-card">
+          <h3 class="mb-2">🔥 Kalender Streak 30 Hari Terakhir</h3>
+          <div id="streakCalendar" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        </div>
+      </section>
+
+      <!-- ========================================
+           PAGE 5: SETUP GUIDE & SUPABASE CONFIG
+           ======================================== -->
+      <section id="page-setup" class="page-view hidden">
+        <div class="page-header">
+          <div>
+            <h2>⚙️ Panduan & Integrasi Supabase</h2>
+            <p>Setup database PostgreSQL, Row Level Security (RLS), dan PostgreSQL RPC Function.</p>
+          </div>
+        </div>
+
+        <!-- Direct In-App Config Card -->
+        <div class="guide-card" style="border:2px solid var(--accent); background:var(--accent-subtle);">
+          <div class="flex items-center justify-between mb-3">
+            <h3 style="margin-bottom:0;">⚡ Hubungkan Proyek Supabase Anda</h3>
+            <span id="supabaseStatusBadge" class="card-status status-new">Mode Demo (Offline)</span>
+          </div>
+          <p style="color:var(--text-secondary); font-size:0.92rem; margin-bottom:16px;">
+            Masukkan Project URL dan Anon Public Key dari dashboard Supabase Anda. Kredensial disimpan di LocalStorage peramban secara aman.
+          </p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:5px; color:var(--text-secondary);">SUPABASE PROJECT URL</label>
+              <input type="text" id="cfgSupabaseUrl" placeholder="https://xyzabcdefg.supabase.co" style="width:100%; padding:10px 12px; border-radius:6px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary);">
+            </div>
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:5px; color:var(--text-secondary);">SUPABASE ANON KEY</label>
+              <input type="text" id="cfgSupabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width:100%; padding:10px 12px; border-radius:6px; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary);">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-accent" onclick="saveSupabaseConfig()">💾 Simpan & Sambungkan</button>
+            <button class="btn btn-ghost" onclick="resetToDemo()">🔄 Reset ke Mode Demo (Offline)</button>
+          </div>
+        </div>
+
+        <!-- Step by Step -->
+        <div class="guide-card">
+          <h3>📋 Langkah 1: Buat Proyek di Supabase</h3>
+          <ol style="margin-left:22px; color:var(--text-secondary); line-height:1.8;">
+            <li>Buka <a href="https://supabase.com" target="_blank" rel="noreferrer">supabase.com</a> dan buat proyek baru (contoh: <code>flashmind-uts</code>).</li>
+            <li>Buka menu <strong>Authentication → Providers</strong>, pastikan provider <strong>Email</strong> aktif. Untuk kemudahan pengujian UTS, nonaktifkan opsi <em>"Confirm Email"</em> agar pengguna bisa langsung masuk tanpa verifikasi link email.</li>
+          </ol>
+        </div>
+
+        <div class="guide-card">
+          <div class="flex items-center justify-between mb-2">
+            <h3>🗄️ Langkah 2: Jalankan SQL Schema & PostgreSQL RPC Function</h3>
+            <button class="btn btn-ghost btn-sm" onclick="copySQL()">📋 Salin SQL</button>
+          </div>
+          <p style="color:var(--text-secondary); margin-bottom:12px; font-size:0.9rem;">
+            Buka menu <strong>SQL Editor</strong> di dashboard Supabase Anda, lalu tempel (paste) dan jalankan (Run) seluruh script SQL berikut:
+          </p>
+          <div class="code-block" id="sqlSchema">-- =========================================================
+-- FlashMind Database Schema & PostgreSQL RPC Function
+-- Aplikasi Flashcard & Spaced Repetition untuk UTS Mahasiswa
+-- =========================================================
+
+-- 1. Enable UUID Extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 2. Tabel Dek Belajar (Decks)
+CREATE TABLE IF NOT EXISTS decks (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  color TEXT DEFAULT '#6366f1',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Tabel Kartu Flashcard (Cards)
+CREATE TABLE IF NOT EXISTS cards (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
+  front TEXT NOT NULL,
+  back TEXT NOT NULL,
+  ease_factor FLOAT DEFAULT 2.5,
+  interval INTEGER DEFAULT 0,
+  repetitions INTEGER DEFAULT 0,
+  next_review TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Tabel Riwayat Review (Review History untuk Statistik Retensi)
+CREATE TABLE IF NOT EXISTS review_history (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  card_id UUID REFERENCES cards(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  quality INTEGER NOT NULL CHECK (quality >= 0 AND quality <= 5),
+  reviewed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Aktifkan Row Level Security (RLS)
+ALTER TABLE decks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_history ENABLE ROW LEVEL SECURITY;
+
+-- 6. Kebijakan RLS (Security Policies)
+CREATE POLICY "Users can CRUD own decks"
+  ON decks FOR ALL
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can CRUD cards in own decks"
+  ON cards FOR ALL
+  USING (deck_id IN (SELECT id FROM decks WHERE user_id = auth.uid()));
+
+CREATE POLICY "Users can CRUD own reviews"
+  ON review_history FOR ALL
+  USING (auth.uid() = user_id);
+
+-- 7. PostgreSQL Function / RPC: Algoritma Spaced Repetition SM-2
+CREATE OR REPLACE FUNCTION calculate_next_review(
+  p_card_id UUID,
+  p_quality INTEGER
+) RETURNS JSON AS $$
+DECLARE
+  v_card cards%ROWTYPE;
+  v_ease FLOAT;
+  v_interval INTEGER;
+  v_reps INTEGER;
+BEGIN
+  SELECT * INTO v_card FROM cards WHERE id = p_card_id;
+  
+  v_ease := v_card.ease_factor;
+  v_interval := v_card.interval;
+  v_reps := v_card.repetitions;
+  
+  -- Algoritma SuperMemo 2 (SM-2)
+  IF p_quality >= 3 THEN
+    IF v_reps = 0 THEN
+      v_interval := 1;
+    ELSIF v_reps = 1 THEN
+      v_interval := 6;
+    ELSE
+      v_interval := ROUND(v_interval * v_ease);
+    END IF;
+    v_reps := v_reps + 1;
+  ELSE
+    v_reps := 0;
+    v_interval := 1;
+  END IF;
+  
+  -- Penyesuaian Ease Factor
+  v_ease := v_ease + (0.1 - (5 - p_quality) * (0.08 + (5 - p_quality) * 0.02));
+  IF v_ease < 1.3 THEN v_ease := 1.3; END IF;
+  
+  -- Perbarui status kartu di database
+  UPDATE cards SET
+    ease_factor = v_ease,
+    interval = v_interval,
+    repetitions = v_reps,
+    next_review = NOW() + (v_interval || ' days')::INTERVAL
+  WHERE id = p_card_id;
+  
+  -- Catat riwayat review untuk statistik retensi
+  INSERT INTO review_history (card_id, user_id, quality)
+  VALUES (p_card_id, (SELECT user_id FROM decks WHERE id = v_card.deck_id), p_quality);
+  
+  RETURN json_build_object(
+    'ease_factor', v_ease,
+    'interval', v_interval,
+    'repetitions', v_reps,
+    'next_review', NOW() + (v_interval || ' days')::INTERVAL
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;</div>
+        </div>
+
+        <div class="guide-card">
+          <h3>📖 Prinsip Kerja Algoritma SM-2 & Fitur PostgreSQL RPC</h3>
+          <p style="color:var(--text-secondary); line-height:1.7; margin-bottom:12px;">
+            Aplikasi ini memanfaatkan fitur <strong>PostgreSQL RPC (Remote Procedure Call)</strong> pada Supabase untuk memindahkan seluruh perhitungan interval memori ke server database (database-side logic). Hal ini memastikan konsistensi data, atomisitas transaksi antara kartu dan riwayat review, serta proteksi keamanan melalui <code>SECURITY DEFINER</code>.
+          </p>
+          <ul style="margin-left:22px; color:var(--text-secondary); line-height:1.7;">
+            <li><strong>Lagi (Quality 1):</strong> Tidak ingat. Repetisi di-reset ke 0, interval kembali ke 1 hari.</li>
+            <li><strong>Sulit (Quality 3):</strong> Ingat dengan susah payah. Repetisi bertambah, Ease Factor sedikit menurun.</li>
+            <li><strong>Baik (Quality 4):</strong> Ingat dengan wajar. Interval bertambah sesuai Ease Factor.</li>
+            <li><strong>Mudah (Quality 5):</strong> Sangat mudah diingat. Ease Factor bertambah sehingga interval berkembang lebih cepat.</li>
+          </ul>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       MODALS
+       ========================================================================== -->
+  <!-- Deck Modal -->
+  <div class="modal-overlay" id="deckModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="deckModalTitle">Buat Dek Baru</h3>
+        <button class="modal-close" onclick="closeModal('deckModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="deckTitleInput">Judul Dek Belajar</label>
+          <input type="text" id="deckTitleInput" placeholder="Contoh: Pemrograman Basis Data" required>
+        </div>
+        <div class="form-group">
+          <label for="deckDescInput">Deskripsi Materi</label>
+          <textarea id="deckDescInput" rows="3" placeholder="Penjelasan singkat mengenai isi dek ini..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Pilihan Warna Label</label>
+          <div class="color-options" id="colorOptions">
+            <div class="color-option selected" data-color="#6366f1" style="background:#6366f1" onclick="selectColor(this)"></div>
+            <div class="color-option" data-color="#8b5cf6" style="background:#8b5cf6" onclick="selectColor(this)"></div>
+            <div class="color-option" data-color="#ec4899" style="background:#ec4899" onclick="selectColor(this)"></div>
+            <div class="color-option" data-color="#ef4444" style="background:#ef4444" onclick="selectColor(this)"></div>
+            <div class="color-option" data-color="#f59e0b" style="background:#f59e0b" onclick="selectColor(this)"></div>
+            <div class="color-option" data-color="#10b981" style="background:#10b981" onclick="selectColor(this)"></div>
+            <div class="color-option" data-color="#06b6d4" style="background:#06b6d4" onclick="selectColor(this)"></div>
+            <div class="color-option" data-color="#3b82f6" style="background:#3b82f6" onclick="selectColor(this)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('deckModal')">Batal</button>
+        <button class="btn btn-accent" id="deckSaveBtn" onclick="saveDeck()">Simpan Dek</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Modal -->
+  <div class="modal-overlay" id="cardModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="cardModalTitle">Tambah Flashcard Baru</h3>
+        <button class="modal-close" onclick="closeModal('cardModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="cardFrontInput">Sisi Depan (Pertanyaan / Konsep)</label>
+          <textarea id="cardFrontInput" rows="3" placeholder="Tuliskan pertanyaan, istilah teknis, atau konsep yang ingin diingat..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="cardBackInput">Sisi Belakang (Jawaban / Penjelasan)</label>
+          <textarea id="cardBackInput" rows="4" placeholder="Tuliskan jawaban lengkap, definisi, atau penjelasan konsep..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('cardModal')">Batal</button>
+        <button class="btn btn-accent" onclick="saveCard()">Simpan Kartu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>⚠️ Konfirmasi Penghapusan</h3>
+        <button class="modal-close" onclick="closeModal('deleteModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="deleteMessage" style="color:var(--text-secondary); line-height:1.6;">Apakah Anda yakin ingin menghapus item ini?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Batal</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">Ya, Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ==========================================================================
+       JAVASCRIPT APPLICATION LOGIC
+       ========================================================================== -->
+  <script>
+    // --------------------------------------------------------------------------
+    // 1. SUPABASE CLIENT & CONFIGURATION
+    // --------------------------------------------------------------------------
+    const DEFAULT_SUPABASE_URL = 'https://vnkpzvnjvqxoogilxfxu.supabase.co';
+    const DEFAULT_SUPABASE_KEY = 'sb_publishable_Sls57sDtaAxPaZj4y3ondA_7Al2qTSU';
+
+    let storedUrl = localStorage.getItem('flashmind_supabase_url') || DEFAULT_SUPABASE_URL;
+    let storedKey = localStorage.getItem('flashmind_supabase_key') || DEFAULT_SUPABASE_KEY;
+
+    let supabaseClient = null;
+    let isDemo = true;
+
+    function initSupabase() {
+      try {
+        if (typeof window.supabase !== 'undefined' && window.supabase.createClient && !storedUrl.includes('YOUR_PROJECT_ID') && storedKey.length > 20) {
+          supabaseClient = window.supabase.createClient(storedUrl, storedKey);
+          isDemo = false;
+          console.log('✅ Supabase connected:', storedUrl);
+        } else {
+          supabaseClient = null;
+          isDemo = true;
+          console.log('ℹ️ Running in Local Demo Mode');
+        }
+      } catch (err) {
+        console.warn('Supabase initialization failed, falling back to Demo Mode:', err);
+        supabaseClient = null;
+        isDemo = true;
+      }
+      updateConnectionStatusUI();
+    }
+
+    function updateConnectionStatusUI() {
+      const badge = document.getElementById('supabaseStatusBadge');
+      const userBadge = document.getElementById('userModeBadge');
+      const urlInput = document.getElementById('cfgSupabaseUrl');
+      const keyInput = document.getElementById('cfgSupabaseKey');
+
+      if (urlInput) urlInput.value = isDemo && storedUrl.includes('YOUR_PROJECT_ID') ? '' : storedUrl;
+      if (keyInput) keyInput.value = isDemo && storedKey.includes('YOUR_ANON_KEY') ? '' : storedKey;
+
+      if (badge) {
+        if (!isDemo && supabaseClient) {
+          badge.textContent = '🟢 Terhubung ke Supabase';
+          badge.className = 'card-status status-learning';
+        } else {
+          badge.textContent = '🟡 Mode Demo (Offline)';
+          badge.className = 'card-status status-review';
+        }
+      }
+      if (userBadge) {
+        userBadge.textContent = !isDemo ? '🟢 Supabase Online' : '🟡 Mode Demo (Offline)';
+      }
+    }
+
+    function saveSupabaseConfig() {
+      const url = document.getElementById('cfgSupabaseUrl').value.trim();
+      const key = document.getElementById('cfgSupabaseKey').value.trim();
+
+      if (!url || !key) {
+        showToast('URL dan Anon Key Supabase harus diisi!', 'error');
+        return;
+      }
+
+      localStorage.setItem('flashmind_supabase_url', url);
+      localStorage.setItem('flashmind_supabase_key', key);
+      storedUrl = url;
+      storedKey = key;
+
+      initSupabase();
+      showToast('Konfigurasi Supabase disimpan! Memuat ulang sesi...', 'success');
+      setTimeout(() => location.reload(), 1200);
+    }
+
+    function resetToDemo() {
+      localStorage.removeItem('flashmind_supabase_url');
+      localStorage.removeItem('flashmind_supabase_key');
+      storedUrl = DEFAULT_SUPABASE_URL;
+      storedKey = DEFAULT_SUPABASE_KEY;
+      initSupabase();
+      showToast('Berhasil di-reset ke Mode Demo (Offline).', 'info');
+      setTimeout(() => location.reload(), 1000);
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. STATE & SAMPLE DATA
+    // --------------------------------------------------------------------------
+    let currentUser = null;
+    let authMode = 'login';
+    let currentDeckId = null;
+    let editingDeckId = null;
+    let editingCardId = null;
+    let deleteTarget = null;
+    let selectedColor = '#6366f1';
+
+    let studyCards = [];
+    let studyIndex = 0;
+    let studyCorrect = 0;
+    let studyWrong = 0;
+    let isFlipped = false;
+
+    let allDecks = [];
+    let allCards = {};
+    let reviewHistory = [];
+
+    let chartReviewsDaily = null;
+    let chartQuality = null;
+    let chartLearned = null;
+
+    function generateId() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+    }
+
+    // Comprehensive sample dataset for university student UTS demo
+    let demoData = {
+      decks: [
+        {
+          id: 'deck-101',
+          user_id: 'demo-user-001',
+          title: 'Pemrograman Web & Basis Data',
+          description: 'Materi UTS: RESTful API, PostgreSQL RLS, arsitektur client-server, dan Supabase Auth.',
+          color: '#6366f1',
+          created_at: new Date(Date.now() - 7 * 86400000).toISOString()
+        },
+        {
+          id: 'deck-102',
+          user_id: 'demo-user-001',
+          title: 'Algoritma & Struktur Data',
+          description: 'Kompleksitas waktu Big-O, Stack vs Queue, Binary Search Tree, dan Algoritma SM-2.',
+          color: '#06b6d4',
+          created_at: new Date(Date.now() - 5 * 86400000).toISOString()
+        },
+        {
+          id: 'deck-103',
+          user_id: 'demo-user-001',
+          title: 'Kosakata Bahasa Inggris Akademik',
+          description: 'Academic vocabulary essential untuk membaca jurnal ilmiah dan publikasi IEEE/ACM.',
+          color: '#10b981',
+          created_at: new Date(Date.now() - 3 * 86400000).toISOString()
+        }
+      ],
+      cards: [
+        // Deck 1 Cards
+        {
+          id: 'card-101',
+          deck_id: 'deck-101',
+          front: 'Apa fungsi utama Row Level Security (RLS) pada PostgreSQL / Supabase?',
+          back: 'RLS membatasi akses baris data pada tabel database berdasarkan klausa keamanan (misal auth.uid() = user_id), sehingga pengguna hanya dapat membaca atau memanipulasi baris data miliknya sendiri.',
+          ease_factor: 2.5,
+          interval: 0,
+          repetitions: 0,
+          next_review: new Date(Date.now() - 3600000).toISOString(),
+          created_at: new Date(Date.now() - 7 * 86400000).toISOString()
+        },
+        {
+          id: 'card-102',
+          deck_id: 'deck-101',
+          front: 'Mengapa menggunakan PostgreSQL RPC / Stored Function menguntungkan untuk algoritma spaced repetition?',
+          back: 'Kalkulasi interval memori dieksekusi langsung di database engine (server-side atomic update), mencegah kecurangan manipulasi waktu pada sisi klien, serta mengurangi latensi jaringan.',
+          ease_factor: 2.6,
+          interval: 1,
+          repetitions: 1,
+          next_review: new Date(Date.now() - 1800000).toISOString(),
+          created_at: new Date(Date.now() - 6 * 86400000).toISOString()
+        },
+        {
+          id: 'card-103',
+          deck_id: 'deck-101',
+          front: 'Apa perbedaan mendasar antara HTTP dan HTTPS?',
+          back: 'HTTPS menggunakan enkripsi SSL/TLS (Transport Layer Security) pada port 443 untuk mengenkripsi paket data antara klien dan server, sementara HTTP mentransmisikan data teks polos (plain text).',
+          ease_factor: 2.4,
+          interval: 6,
+          repetitions: 2,
+          next_review: new Date(Date.now() - 500000).toISOString(),
+          created_at: new Date(Date.now() - 6 * 86400000).toISOString()
+        },
+        {
+          id: 'card-104',
+          deck_id: 'deck-101',
+          front: 'Jelaskan prinsip arsitektur RESTful API yang bersifat Stateless!',
+          back: 'Server tidak menyimpan context sesi klien di antara request. Setiap HTTP request dari klien harus memuat seluruh informasi dan kredensial (misal JWT Bearer token) yang dibutuhkan untuk memproses request.',
+          ease_factor: 2.5,
+          interval: 12,
+          repetitions: 3,
+          next_review: new Date(Date.now() + 86400000).toISOString(),
+          created_at: new Date(Date.now() - 5 * 86400000).toISOString()
+        },
+
+        // Deck 2 Cards
+        {
+          id: 'card-201',
+          deck_id: 'deck-102',
+          front: 'Apa perbedaan mendasar antara Stack dan Queue dalam struktur data?',
+          back: 'Stack menerapkan prinsip LIFO (Last In, First Out) contohnya pemanggilan fungsi (call stack), sedangkan Queue menerapkan prinsip FIFO (First In, First Out) contohnya antrian proses cetak printer.',
+          ease_factor: 2.5,
+          interval: 0,
+          repetitions: 0,
+          next_review: new Date(Date.now() - 1000000).toISOString(),
+          created_at: new Date(Date.now() - 5 * 86400000).toISOString()
+        },
+        {
+          id: 'card-202',
+          deck_id: 'deck-102',
+          front: 'Berapa kompleksitas waktu rata-rata (average time complexity) dari algoritma QuickSort?',
+          back: 'O(n log n). Namun pada kasus terburuk (worst case) bila pemilihan elemen pivot buruk, kompleksitasnya dapat menurun menjadi O(n²).',
+          ease_factor: 2.7,
+          interval: 1,
+          repetitions: 1,
+          next_review: new Date(Date.now() - 2000000).toISOString(),
+          created_at: new Date(Date.now() - 4 * 86400000).toISOString()
+        },
+        {
+          id: 'card-203',
+          deck_id: 'deck-102',
+          front: 'Bagaimana penentuan interval pengulangan pada repetisi ke-1 dan ke-2 dalam algoritma SM-2?',
+          back: 'Repetisi 1 = 1 hari. Repetisi 2 = 6 hari. Mulai repetisi 3 ke atas, Interval = Interval Sebelumnya × Ease Factor.',
+          ease_factor: 2.5,
+          interval: 14,
+          repetitions: 3,
+          next_review: new Date(Date.now() + 2 * 86400000).toISOString(),
+          created_at: new Date(Date.now() - 4 * 86400000).toISOString()
+        },
+
+        // Deck 3 Cards
+        {
+          id: 'card-301',
+          deck_id: 'deck-103',
+          front: 'Hypothesis (Kata Benda)',
+          back: 'Hipotesis: Dugaan sementara atau penjelasan yang diajukan berdasarkan bukti terbatas sebagai titik awal investigasi ilmiah lebih lanjut.',
+          ease_factor: 2.5,
+          interval: 0,
+          repetitions: 0,
+          next_review: new Date(Date.now() - 500000).toISOString(),
+          created_at: new Date(Date.now() - 3 * 86400000).toISOString()
+        },
+        {
+          id: 'card-302',
+          deck_id: 'deck-103',
+          front: 'Empirical (Kata Sifat)',
+          back: 'Empiris: Berdasarkan pengamatan, observasi, atau eksperimen langsung di dunia nyata, bukan semata-mata pada teori atau logika murni.',
+          ease_factor: 2.6,
+          interval: 2,
+          repetitions: 1,
+          next_review: new Date(Date.now() - 100000).toISOString(),
+          created_at: new Date(Date.now() - 3 * 86400000).toISOString()
+        },
+        {
+          id: 'card-303',
+          deck_id: 'deck-103',
+          front: 'Synthesize (Kata Kerja)',
+          back: 'Mensintesis: Menggabungkan beberapa ide, data, atau perspektif penelitian yang berbeda menjadi satu kesatuan pemahaman yang koheren.',
+          ease_factor: 2.4,
+          interval: 8,
+          repetitions: 3,
+          next_review: new Date(Date.now() + 3 * 86400000).toISOString(),
+          created_at: new Date(Date.now() - 2 * 86400000).toISOString()
+        }
+      ],
+      reviews: []
+    };
+
+    // Seed 32 realistic review history events across last 7 days
+    (function seedSampleReviews() {
+      const qualities = [4, 5, 4, 3, 5, 4, 5, 1, 4, 5, 3, 4, 5, 4, 5, 4, 1, 5, 4, 3, 4, 5, 5, 4, 4, 5, 3, 5, 4, 5, 4, 5];
+      const now = Date.now();
+      for (let i = 0; i < qualities.length; i++) {
+        const dayOffset = Math.floor((qualities.length - 1 - i) / 5); // 0 to 6 days ago
+        const reviewDate = new Date(now - dayOffset * 86400000 - (i % 5) * 3600000).toISOString();
+        const cardId = 'card-' + (101 + (i % 7));
+        demoData.reviews.push({
+          id: 'rev-' + (1000 + i),
+          card_id: cardId,
+          user_id: 'demo-user-001',
+          quality: qualities[i],
+          reviewed_at: reviewDate
+        });
+      }
+    })();
+
+    // --------------------------------------------------------------------------
+    // 3. AUTHENTICATION & LOGIN
+    // --------------------------------------------------------------------------
+    function switchAuthTab(mode) {
+      authMode = mode;
+      document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+      document.getElementById('tabRegister').classList.toggle('active', mode === 'register');
+      document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Masuk' : 'Daftar Akun Baru';
+      document.getElementById('authError').style.display = 'none';
+      document.getElementById('authSuccess').style.display = 'none';
+    }
+
+    async function handleAuth(e) {
+      e.preventDefault();
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const btn = document.getElementById('authSubmitBtn');
+      const errEl = document.getElementById('authError');
+      const sucEl = document.getElementById('authSuccess');
+
+      errEl.style.display = 'none';
+      sucEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Memproses...';
+
+      if (isDemo || !supabaseClient) {
+        // Fast local demo mode
+        setTimeout(() => {
+          currentUser = { id: 'demo-user-001', email: email || 'mahasiswa@kampus.ac.id' };
+          initializeApp();
+          btn.disabled = false;
+          btn.textContent = authMode === 'login' ? 'Masuk' : 'Daftar Akun Baru';
+          showToast('Masuk berhasil dalam Mode Demo!', 'success');
+        }, 400);
+        return;
+      }
+
+      try {
+        let res;
+        if (authMode === 'login') {
+          res = await supabaseClient.auth.signInWithPassword({ email, password });
+        } else {
+          res = await supabaseClient.auth.signUp({ email, password });
+        }
+
+        if (res.error) {
+          errEl.textContent = res.error.message;
+          errEl.style.display = 'block';
+        } else if (authMode === 'register' && res.data?.user && !res.data.session) {
+          sucEl.textContent = 'Pendaftaran berhasil! Silakan periksa inbox email Anda untuk konfirmasi akun.';
+          sucEl.style.display = 'block';
+        } else {
+          currentUser = res.data.user;
+          initializeApp();
+          showToast('Selamat datang, ' + currentUser.email + '!', 'success');
+        }
+      } catch (err) {
+        errEl.textContent = 'Gagal menghubungi server. Menggunakan mode demo offline.';
+        errEl.style.display = 'block';
+        currentUser = { id: 'demo-user-001', email: email || 'mahasiswa@kampus.ac.id' };
+        initializeApp();
+      }
+
+      btn.disabled = false;
+      btn.textContent = authMode === 'login' ? 'Masuk' : 'Daftar Akun Baru';
+    }
+
+    function loginAsDemo() {
+      currentUser = { id: 'demo-user-001', email: 'mahasiswa.uts@kampus.ac.id' };
+      initializeApp();
+      showToast('Masuk sebagai Tamu Demo Mahasiswa', 'info');
+    }
+
+    async function handleLogout() {
+      if (!isDemo && supabaseClient) {
+        try { await supabaseClient.auth.signOut(); } catch(e){}
+      }
+      currentUser = null;
+      document.getElementById('authPage').style.display = '';
+      document.getElementById('appLayout').classList.remove('active');
+      showToast('Anda telah keluar.', 'info');
+    }
+
+    // --------------------------------------------------------------------------
+    // 4. DATA ACCESS LAYER (ABSTRACTION FOR SUPABASE & DEMO)
+    // --------------------------------------------------------------------------
+    const DB = {
+      async getDecks() {
+        if (isDemo || !supabaseClient) {
+          return demoData.decks.filter(d => d.user_id === currentUser.id);
+        }
+        const { data, error } = await supabaseClient.from('decks').select('*').order('created_at', { ascending: false });
+        if (error) { showToast(error.message, 'error'); return []; }
+        return data || [];
+      },
+
+      async createDeck(deck) {
+        if (isDemo || !supabaseClient) {
+          const d = { id: generateId(), user_id: currentUser.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...deck };
+          demoData.decks.unshift(d);
+          return d;
+        }
+        const { data, error } = await supabaseClient.from('decks').insert({ ...deck, user_id: currentUser.id }).select().single();
+        if (error) { showToast(error.message, 'error'); return null; }
+        return data;
+      },
+
+      async updateDeck(id, updates) {
+        if (isDemo || !supabaseClient) {
+          const idx = demoData.decks.findIndex(d => d.id === id);
+          if (idx >= 0) Object.assign(demoData.decks[idx], updates, { updated_at: new Date().toISOString() });
+          return demoData.decks[idx];
+        }
+        const { data, error } = await supabaseClient.from('decks').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+        if (error) { showToast(error.message, 'error'); return null; }
+        return data;
+      },
+
+      async deleteDeck(id) {
+        if (isDemo || !supabaseClient) {
+          demoData.decks = demoData.decks.filter(d => d.id !== id);
+          demoData.cards = demoData.cards.filter(c => c.deck_id !== id);
+          return true;
+        }
+        const { error } = await supabaseClient.from('decks').delete().eq('id', id);
+        if (error) { showToast(error.message, 'error'); return false; }
+        return true;
+      },
+
+      async getCards(deckId) {
+        if (isDemo || !supabaseClient) {
+          return demoData.cards.filter(c => c.deck_id === deckId);
+        }
+        const { data, error } = await supabaseClient.from('cards').select('*').eq('deck_id', deckId).order('created_at');
+        if (error) { showToast(error.message, 'error'); return []; }
+        return data || [];
+      },
+
+      async getAllCards() {
+        if (isDemo || !supabaseClient) {
+          const userDeckIds = demoData.decks.filter(d => d.user_id === currentUser.id).map(d => d.id);
+          return demoData.cards.filter(c => userDeckIds.includes(c.deck_id));
+        }
+        const { data, error } = await supabaseClient.from('cards').select('*, decks!inner(user_id)').eq('decks.user_id', currentUser.id);
+        if (error) return [];
+        return data || [];
+      },
+
+      async createCard(card) {
+        if (isDemo || !supabaseClient) {
+          const c = { id: generateId(), ease_factor: 2.5, interval: 0, repetitions: 0, next_review: new Date().toISOString(), created_at: new Date().toISOString(), ...card };
+          demoData.cards.push(c);
+          return c;
+        }
+        const { data, error } = await supabaseClient.from('cards').insert(card).select().single();
+        if (error) { showToast(error.message, 'error'); return null; }
+        return data;
+      },
+
+      async updateCard(id, updates) {
+        if (isDemo || !supabaseClient) {
+          const idx = demoData.cards.findIndex(c => c.id === id);
+          if (idx >= 0) Object.assign(demoData.cards[idx], updates);
+          return demoData.cards[idx];
+        }
+        const { data, error } = await supabaseClient.from('cards').update(updates).eq('id', id).select().single();
+        if (error) { showToast(error.message, 'error'); return null; }
+        return data;
+      },
+
+      async deleteCard(id) {
+        if (isDemo || !supabaseClient) {
+          demoData.cards = demoData.cards.filter(c => c.id !== id);
+          return true;
+        }
+        const { error } = await supabaseClient.from('cards').delete().eq('id', id);
+        if (error) { showToast(error.message, 'error'); return false; }
+        return true;
+      },
+
+      async getReviews() {
+        if (isDemo || !supabaseClient) {
+          return demoData.reviews.filter(r => r.user_id === currentUser.id);
+        }
+        const { data, error } = await supabaseClient.from('review_history').select('*').eq('user_id', currentUser.id).order('reviewed_at', { ascending: false });
+        if (error) return [];
+        return data || [];
+      },
+
+      // SuperMemo 2 calculation with PostgreSQL RPC and automatic fallback
+      async calculateNextReview(cardId, quality) {
+        if (!isDemo && supabaseClient) {
+          try {
+            const { data, error } = await supabaseClient.rpc('calculate_next_review', { p_card_id: cardId, p_quality: quality });
+            if (!error && data) return data;
+            console.warn('RPC call failed, using client-side fallback:', error?.message);
+          } catch(e) {
+            console.warn('RPC exception, using client fallback:', e);
+          }
+        }
+        return sm2Calculate(cardId, quality);
+      },
+
+      async getDueCards(deckId) {
+        const now = new Date();
+        if (isDemo || !supabaseClient) {
+          return demoData.cards.filter(c => c.deck_id === deckId && new Date(c.next_review) <= now);
+        }
+        const { data, error } = await supabaseClient.from('cards').select('*').eq('deck_id', deckId).lte('next_review', now.toISOString()).order('next_review');
+        if (error) return [];
+        return data || [];
+      },
+
+      async getAllDueCards() {
+        const now = new Date();
+        if (isDemo || !supabaseClient) {
+          const userDeckIds = demoData.decks.filter(d => d.user_id === currentUser.id).map(d => d.id);
+          return demoData.cards.filter(c => userDeckIds.includes(c.deck_id) && new Date(c.next_review) <= now);
+        }
+        const { data, error } = await supabaseClient.from('cards').select('*, decks!inner(user_id)').eq('decks.user_id', currentUser.id).lte('next_review', now.toISOString());
+        if (error) return [];
+        return data || [];
+      }
+    };
+
+    // --------------------------------------------------------------------------
+    // 5. SM-2 SPACED REPETITION ALGORITHM
+    // --------------------------------------------------------------------------
+    function sm2Calculate(cardId, quality) {
+      let card = null;
+      if (isDemo || !supabaseClient) {
+        card = demoData.cards.find(c => c.id === cardId);
+      } else {
+        card = studyCards.find(c => c.id === cardId);
+      }
+      if (!card) return null;
+
+      let ease = card.ease_factor || 2.5;
+      let interval = card.interval || 0;
+      let reps = card.repetitions || 0;
+
+      if (quality >= 3) {
+        if (reps === 0) interval = 1;
+        else if (reps === 1) interval = 6;
+        else interval = Math.round(interval * ease);
+        reps++;
+      } else {
+        reps = 0;
+        interval = 1;
+      }
+
+      ease = ease + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+      if (ease < 1.3) ease = 1.3;
+
+      const nextReview = new Date();
+      nextReview.setDate(nextReview.getDate() + interval);
+
+      // Save in Demo
+      if (isDemo || !supabaseClient) {
+        const idx = demoData.cards.findIndex(c => c.id === cardId);
+        if (idx >= 0) {
+          demoData.cards[idx].ease_factor = ease;
+          demoData.cards[idx].interval = interval;
+          demoData.cards[idx].repetitions = reps;
+          demoData.cards[idx].next_review = nextReview.toISOString();
+        }
+        demoData.reviews.push({
+          id: generateId(),
+          card_id: cardId,
+          user_id: currentUser.id,
+          quality: quality,
+          reviewed_at: new Date().toISOString()
+        });
+      } else {
+        // Fallback direct table update if RPC failed
+        supabaseClient.from('cards').update({
+          ease_factor: ease,
+          interval: interval,
+          repetitions: reps,
+          next_review: nextReview.toISOString()
+        }).eq('id', cardId).then(() => {});
+
+        supabaseClient.from('review_history').insert({
+          card_id: cardId,
+          user_id: currentUser.id,
+          quality: quality
+        }).then(() => {});
+      }
+
+      return { ease_factor: ease, interval, repetitions: reps, next_review: nextReview.toISOString() };
+    }
+
+    function previewInterval(card, quality) {
+      if (!card) return '—';
+      let ease = card.ease_factor || 2.5;
+      let interval = card.interval || 0;
+      let reps = card.repetitions || 0;
+
+      if (quality >= 3) {
+        if (reps === 0) interval = 1;
+        else if (reps === 1) interval = 6;
+        else interval = Math.round((interval || 1) * ease);
+      } else {
+        interval = 1;
+      }
+
+      if (interval === 1) return '1 hari';
+      if (interval < 30) return interval + ' hari';
+      if (interval < 365) return Math.round(interval / 30) + ' bulan';
+      return (interval / 365).toFixed(1) + ' tahun';
+    }
+
+    // --------------------------------------------------------------------------
+    // 6. APP INITIALIZATION & NAVIGATION
+    // --------------------------------------------------------------------------
+    function initializeApp() {
+      document.getElementById('authPage').style.display = 'none';
+      document.getElementById('appLayout').classList.add('active');
+
+      const email = currentUser?.email || 'mahasiswa@demo.com';
+      document.getElementById('userEmail').textContent = email;
+      document.getElementById('userAvatar').textContent = email.charAt(0).toUpperCase();
+
+      updateConnectionStatusUI();
+      navigateTo('dashboard');
+    }
+
+    function navigateTo(page) {
+      document.querySelectorAll('.page-view').forEach(p => p.classList.add('hidden'));
+      const target = document.getElementById('page-' + page);
+      if (target) target.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      const navBtn = document.querySelector(`.nav-item[data-page="${page}"]`);
+      if (navBtn) navBtn.classList.add('active');
+
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebarOverlay').classList.remove('open');
+
+      if (page === 'dashboard') loadDashboard();
+      if (page === 'statistics') loadStatistics();
+    }
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebarOverlay').classList.toggle('open');
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next === 'dark' ? '' : 'light');
+      localStorage.setItem('flashmind-theme', next);
+      if (chartReviewsDaily) renderReviewsChart(reviewHistory);
+    }
+
+    (function() {
+      const savedTheme = localStorage.getItem('flashmind-theme');
+      if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    })();
+
+    // --------------------------------------------------------------------------
+    // 7. DASHBOARD LOGIC
+    // --------------------------------------------------------------------------
+    async function loadDashboard() {
+      allDecks = await DB.getDecks();
+      const allCardsArr = await DB.getAllCards();
+      const dueCards = await DB.getAllDueCards();
+      reviewHistory = await DB.getReviews();
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayReviews = reviewHistory.filter(r => r.reviewed_at && r.reviewed_at.startsWith(todayStr));
+
+      document.getElementById('statTotalDecks').textContent = allDecks.length;
+      document.getElementById('statTotalCards').textContent = allCardsArr.length;
+      document.getElementById('statDueCards').textContent = dueCards.length;
+      document.getElementById('statReviewedToday').textContent = todayReviews.length;
+
+      const badge = document.getElementById('dueBadge');
+      if (dueCards.length > 0) {
+        badge.textContent = dueCards.length;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+
+      renderDecksList(allDecks, allCardsArr, dueCards);
+    }
+
+    function renderDecksList(decks, allCardsArr, dueCards) {
+      const container = document.getElementById('decksList');
+      if (!decks || decks.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <h3>Belum Ada Dek Belajar</h3>
+            <p>Buat dek pertama Anda untuk memulai pengulangan berkala.</p>
+            <button class="btn btn-accent mt-2" onclick="openDeckModal()">➕ Buat Dek Pertama</button>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = decks.map(deck => {
+        const deckCards = allCardsArr.filter(c => c.deck_id === deck.id);
+        const dueCount = dueCards.filter(c => c.deck_id === deck.id).length;
+        const color = deck.color || '#6366f1';
+
+        return `
+          <div class="deck-card">
+            <div class="deck-color-bar" style="background:${color};"></div>
+            <div class="deck-card-body" onclick="openDeck('${deck.id}')">
+              <h3>${escapeHtml(deck.title)}</h3>
+              <div class="deck-desc">${escapeHtml(deck.description || 'Tidak ada deskripsi')}</div>
+              <div class="deck-meta">
+                <span>🃏 ${deckCards.length} kartu</span>
+                <span style="color:${dueCount > 0 ? 'var(--warning)' : 'inherit'};">⏰ ${dueCount} perlu review</span>
+              </div>
+            </div>
+            <div class="deck-actions-row">
+              <button onclick="openDeck('${deck.id}')">📖 Buka Dek</button>
+              <button onclick="startStudyFromDashboard('${deck.id}')" style="color:var(--accent);">▶ Belajar</button>
+              <button onclick="editDeck('${deck.id}')">✏️ Edit</button>
+              <button onclick="promptDeleteDeck('${deck.id}', '${escapeHtml(deck.title)}')">🗑️ Hapus</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // --------------------------------------------------------------------------
+    // 8. DECK MANAGEMENT (CRUD)
+    // --------------------------------------------------------------------------
+    function openDeckModal(deckId = null) {
+      editingDeckId = deckId;
+      document.getElementById('deckModalTitle').textContent = deckId ? 'Edit Dek' : 'Buat Dek Baru';
+      document.getElementById('deckSaveBtn').textContent = deckId ? 'Simpan Perubahan' : 'Buat Dek';
+
+      if (deckId) {
+        const deck = allDecks.find(d => d.id === deckId);
+        if (deck) {
+          document.getElementById('deckTitleInput').value = deck.title;
+          document.getElementById('deckDescInput').value = deck.description || '';
+          selectedColor = deck.color || '#6366f1';
+        }
+      } else {
+        document.getElementById('deckTitleInput').value = '';
+        document.getElementById('deckDescInput').value = '';
+        selectedColor = '#6366f1';
+      }
+
+      document.querySelectorAll('.color-option').forEach(c => {
+        c.classList.toggle('selected', c.dataset.color === selectedColor);
+      });
+
+      openModal('deckModal');
+    }
+
+    function selectColor(el) {
+      selectedColor = el.dataset.color;
+      document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    async function saveDeck() {
+      const title = document.getElementById('deckTitleInput').value.trim();
+      const description = document.getElementById('deckDescInput').value.trim();
+
+      if (!title) {
+        showToast('Judul dek wajib diisi!', 'error');
+        return;
+      }
+
+      if (editingDeckId) {
+        await DB.updateDeck(editingDeckId, { title, description, color: selectedColor });
+        showToast('Dek berhasil diperbarui!', 'success');
+      } else {
+        await DB.createDeck({ title, description, color: selectedColor });
+        showToast('Dek baru berhasil dibuat!', 'success');
+      }
+
+      closeModal('deckModal');
+      loadDashboard();
+    }
+
+    function editDeck(id) {
+      openDeckModal(id);
+    }
+
+    function promptDeleteDeck(id, title) {
+      deleteTarget = { type: 'deck', id };
+      document.getElementById('deleteMessage').textContent = `Hapus dek "${title}" beserta seluruh kartu di dalamnya? Tindakan ini tidak dapat dibatalkan.`;
+      openModal('deleteModal');
+    }
+
+    async function confirmDelete() {
+      if (!deleteTarget) return;
+
+      if (deleteTarget.type === 'deck') {
+        await DB.deleteDeck(deleteTarget.id);
+        showToast('Dek berhasil dihapus!', 'success');
+        loadDashboard();
+      } else if (deleteTarget.type === 'card') {
+        await DB.deleteCard(deleteTarget.id);
+        showToast('Kartu berhasil dihapus!', 'success');
+        openDeck(currentDeckId);
+      }
+
+      deleteTarget = null;
+      closeModal('deleteModal');
+    }
+
+    // --------------------------------------------------------------------------
+    // 9. DECK DETAIL & CARDS CRUD
+    // --------------------------------------------------------------------------
+    async function openDeck(deckId) {
+      currentDeckId = deckId;
+      const deck = allDecks.find(d => d.id === deckId);
+      if (!deck) {
+        showToast('Dek tidak ditemukan!', 'error');
+        return;
+      }
+
+      document.getElementById('deckDetailTitle').textContent = deck.title;
+      document.getElementById('deckDetailDesc').textContent = deck.description || 'Tidak ada deskripsi';
+
+      navigateTo('deck-detail');
+
+      const cards = await DB.getCards(deckId);
+      allCards[deckId] = cards;
+
+      const now = new Date();
+      const dueCount = cards.filter(c => new Date(c.next_review) <= now).length;
+
+      const studyBtn = document.getElementById('startStudyBtn');
+      studyBtn.textContent = dueCount > 0 ? `▶ Review (${dueCount} kartu)` : '✅ Semua Kartu Sudah Di-Review';
+      studyBtn.disabled = dueCount === 0;
+
+      renderCardTable(cards);
+    }
+
+    function renderCardTable(cards) {
+      const container = document.getElementById('cardTable');
+      if (!cards || cards.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🃏</div>
+            <h3>Belum Ada Kartu di Dek Ini</h3>
+            <p>Tambahkan kartu pertanyaan dan jawaban untuk memulai sesi belajar.</p>
+            <button class="btn btn-accent mt-2" onclick="openCardModal()">➕ Tambah Kartu Pertama</button>
+          </div>`;
+        return;
+      }
+
+      const now = new Date();
+      container.innerHTML = `
+        <div class="card-table">
+          <div class="card-table-header">
+            <div>Pertanyaan (Depan)</div>
+            <div>Jawaban (Belakang)</div>
+            <div>Status</div>
+            <div>Aksi</div>
+          </div>
+          ${cards.map(c => {
+            const isDue = new Date(c.next_review) <= now;
+            let status = 'Dipelajari';
+            let statusClass = 'status-learning';
+            if (c.repetitions === 0) {
+              status = 'Baru';
+              statusClass = 'status-new';
+            } else if (isDue) {
+              status = 'Perlu Review';
+              statusClass = 'status-review';
+            }
+            return `
+              <div class="card-row">
+                <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(c.front)}</div>
+                <div style="color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(c.back)}</div>
+                <div><span class="card-status ${statusClass}">${status}</span></div>
+                <div class="card-row-actions">
+                  <button onclick="editCard('${c.id}')" title="Edit">✏️</button>
+                  <button class="del" onclick="promptDeleteCard('${c.id}', '${escapeHtml(c.front).replace(/'/g, "\'")}')" title="Hapus">🗑️</button>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    function openCardModal(cardId = null) {
+      editingCardId = cardId;
+      document.getElementById('cardModalTitle').textContent = cardId ? 'Edit Flashcard' : 'Tambah Flashcard Baru';
+
+      if (cardId) {
+        const cards = allCards[currentDeckId] || [];
+        const card = cards.find(c => c.id === cardId);
+        if (card) {
+          document.getElementById('cardFrontInput').value = card.front;
+          document.getElementById('cardBackInput').value = card.back;
+        }
+      } else {
+        document.getElementById('cardFrontInput').value = '';
+        document.getElementById('cardBackInput').value = '';
+      }
+
+      openModal('cardModal');
+    }
+
+    async function saveCard() {
+      const front = document.getElementById('cardFrontInput').value.trim();
+      const back = document.getElementById('cardBackInput').value.trim();
+
+      if (!front || !back) {
+        showToast('Kedua sisi kartu (Pertanyaan & Jawaban) harus diisi!', 'error');
+        return;
+      }
+
+      if (editingCardId) {
+        await DB.updateCard(editingCardId, { front, back });
+        showToast('Kartu berhasil diperbarui!', 'success');
+      } else {
+        await DB.createCard({ deck_id: currentDeckId, front, back });
+        showToast('Kartu baru berhasil ditambahkan!', 'success');
+      }
+
+      closeModal('cardModal');
+      openDeck(currentDeckId);
+    }
+
+    function editCard(id) {
+      openCardModal(id);
+    }
+
+    function promptDeleteCard(id, frontText) {
+      deleteTarget = { type: 'card', id };
+      document.getElementById('deleteMessage').textContent = `Hapus kartu "${frontText}"?`;
+      openModal('deleteModal');
+    }
+
+    // --------------------------------------------------------------------------
+    // 10. STUDY SESSION & SM-2 INTERACTION
+    // --------------------------------------------------------------------------
+    async function startStudyFromDashboard(deckId) {
+      currentDeckId = deckId;
+      const deck = allDecks.find(d => d.id === deckId);
+      if (deck) document.getElementById('deckDetailTitle').textContent = deck.title;
+      await startStudy(false);
+    }
+
+    async function startStudy(forceAll = false) {
+      let cardsToStudy;
+      if (forceAll) {
+        cardsToStudy = await DB.getCards(currentDeckId);
+      } else {
+        cardsToStudy = await DB.getDueCards(currentDeckId);
+        if (cardsToStudy.length === 0) {
+          cardsToStudy = await DB.getCards(currentDeckId);
+          if (cardsToStudy.length > 0) {
+            showToast('Tidak ada kartu yang perlu di-review hari ini. Masuk ke mode latihan bebas!', 'info');
+          }
+        }
+      }
+
+      if (!cardsToStudy || cardsToStudy.length === 0) {
+        showToast('Belum ada kartu di dek ini!', 'warning');
+        return;
+      }
+
+      studyCards = shuffleArray([...cardsToStudy]);
+      studyIndex = 0;
+      studyCorrect = 0;
+      studyWrong = 0;
+      isFlipped = false;
+
+      const deck = allDecks.find(d => d.id === currentDeckId);
+      document.getElementById('studyDeckName').textContent = deck ? deck.title : 'Sesi Belajar';
+
+      navigateTo('study');
+      document.getElementById('studyArea').classList.remove('hidden');
+      document.getElementById('studyComplete').classList.add('hidden');
+
+      showStudyCard();
+    }
+
+    function showStudyCard() {
+      if (studyIndex >= studyCards.length) {
+        finishStudy();
+        return;
+      }
+
+      const card = studyCards[studyIndex];
+      const progress = Math.round((studyIndex / studyCards.length) * 100);
+
+      document.getElementById('studyProgressFill').style.width = progress + '%';
+      document.getElementById('studyProgressText').textContent = `Kartu ${studyIndex + 1} dari ${studyCards.length}`;
+
+      document.getElementById('cardFront').textContent = card.front;
+      document.getElementById('cardBack').textContent = card.back;
+
+      isFlipped = false;
+      document.getElementById('flashcard').classList.remove('flipped');
+      document.getElementById('ratingButtons').style.display = 'none';
+
+      document.getElementById('intervalHard').textContent = previewInterval(card, 3);
+      document.getElementById('intervalGood').textContent = previewInterval(card, 4);
+      document.getElementById('intervalEasy').textContent = previewInterval(card, 5);
+    }
+
+    function flipCard() {
+      isFlipped = !isFlipped;
+      document.getElementById('flashcard').classList.toggle('flipped', isFlipped);
+      document.getElementById('ratingButtons').style.display = isFlipped ? 'grid' : 'none';
+    }
+
+    async function rateCard(quality) {
+      if (!isFlipped) {
+        flipCard();
+        return;
+      }
+
+      const card = studyCards[studyIndex];
+      await DB.calculateNextReview(card.id, quality);
+
+      if (quality >= 3) studyCorrect++;
+      else studyWrong++;
+
+      studyIndex++;
+      showStudyCard();
+    }
+
+    function finishStudy() {
+      document.getElementById('studyArea').classList.add('hidden');
+      document.getElementById('studyComplete').classList.remove('hidden');
+      document.getElementById('studyProgressFill').style.width = '100%';
+
+      document.getElementById('summaryTotal').textContent = studyCards.length;
+      document.getElementById('summaryCorrect').textContent = studyCorrect;
+      document.getElementById('summaryWrong').textContent = studyWrong;
+    }
+
+    function exitStudy() {
+      if (currentDeckId) {
+        openDeck(currentDeckId);
+      } else {
+        navigateTo('dashboard');
+      }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      const studyPage = document.getElementById('page-study');
+      if (studyPage && !studyPage.classList.contains('hidden') && !document.getElementById('studyArea').classList.contains('hidden')) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          flipCard();
+        } else if (isFlipped) {
+          if (e.key === '1') rateCard(1);
+          else if (e.key === '2') rateCard(3);
+          else if (e.key === '3') rateCard(4);
+          else if (e.key === '4') rateCard(5);
+        }
+      }
+    });
+
+    // --------------------------------------------------------------------------
+    // 11. RETENTION STATISTICS & CHARTS
+    // --------------------------------------------------------------------------
+    async function loadStatistics() {
+      reviewHistory = await DB.getReviews();
+      const allCardsArr = await DB.getAllCards();
+
+      document.getElementById('statTotalReviews').textContent = reviewHistory.length;
+
+      // Retention Rate: quality >= 3 considered successful recall
+      const successful = reviewHistory.filter(r => r.quality >= 3).length;
+      const retention = reviewHistory.length > 0 ? Math.round((successful / reviewHistory.length) * 100) : 0;
+      document.getElementById('statRetention').textContent = retention + '%';
+
+      // Streak
+      const streak = calculateStreak(reviewHistory);
+      document.getElementById('statStreak').textContent = streak + ' hari';
+
+      // Average per day
+      const daySet = new Set(reviewHistory.map(r => r.reviewed_at ? r.reviewed_at.split('T')[0] : ''));
+      daySet.delete('');
+      const avg = daySet.size > 0 ? Math.round(reviewHistory.length / daySet.size) : 0;
+      document.getElementById('statAvgPerDay').textContent = avg;
+
+      renderReviewsChart(reviewHistory);
+      renderQualityChart(reviewHistory);
+      renderLearnedChart(allCardsArr);
+      renderHeatmap(reviewHistory);
+      renderStreakCalendar(reviewHistory);
+    }
+
+    function calculateStreak(reviews) {
+      if (!reviews || reviews.length === 0) return 0;
+
+      const days = new Set();
+      reviews.forEach(r => {
+        if (r.reviewed_at) days.add(r.reviewed_at.split('T')[0]);
+      });
+
+      const sorted = [...days].sort().reverse();
+      if (sorted.length === 0) return 0;
+
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+      if (sorted[0] !== today && sorted[0] !== yesterday) return 0;
+
+      let streak = 1;
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const curr = new Date(sorted[i]);
+        const prev = new Date(sorted[i + 1]);
+        const diff = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+        if (diff === 1) streak++;
+        else break;
+      }
+      return streak;
+    }
+
+    function renderReviewsChart(reviews) {
+      const ctx = document.getElementById('chartReviewsDaily');
+      if (chartReviewsDaily) chartReviewsDaily.destroy();
+
+      const last7 = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000);
+        last7.push(d.toISOString().split('T')[0]);
+      }
+
+      const counts = last7.map(day => reviews.filter(r => r.reviewed_at && r.reviewed_at.startsWith(day)).length);
+      const labels = last7.map(d => {
+        const dt = new Date(d);
+        return dt.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' });
+      });
+
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const textColor = isLight ? '#475569' : '#9da4c0';
+      const gridColor = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+
+      chartReviewsDaily = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Jumlah Kartu Di-Review',
+            data: counts,
+            backgroundColor: 'rgba(99, 102, 241, 0.75)',
+            borderColor: '#6366f1',
+            borderWidth: 1.5,
+            borderRadius: 6,
+            maxBarThickness: 42
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.parsed.y} kartu di-review`
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0, color: textColor },
+              grid: { color: gridColor }
+            },
+            x: {
+              ticks: { color: textColor },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    function renderQualityChart(reviews) {
+      const ctx = document.getElementById('chartQuality');
+      if (chartQuality) chartQuality.destroy();
+
+      const counts = [0, 0, 0, 0, 0, 0];
+      reviews.forEach(r => {
+        if (r.quality >= 0 && r.quality <= 5) counts[r.quality]++;
+      });
+
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const textColor = isLight ? '#475569' : '#9da4c0';
+
+      chartQuality = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Lagi (1)', 'Sulit (3)', 'Baik (4)', 'Mudah (5)'],
+          datasets: [{
+            data: [counts[1], counts[3], counts[4], counts[5]],
+            backgroundColor: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6'],
+            borderWidth: 0,
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: textColor, padding: 12, usePointStyle: true, font: { size: 11, weight: '600' } }
+            }
+          }
+        }
+      });
+    }
+
+    function renderLearnedChart(cards) {
+      const ctx = document.getElementById('chartLearned');
+      if (chartLearned) chartLearned.destroy();
+
+      const newCards = cards.filter(c => c.repetitions === 0).length;
+      const learning = cards.filter(c => c.repetitions > 0 && c.repetitions <= 2).length;
+      const mature = cards.filter(c => c.repetitions > 2).length;
+
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const textColor = isLight ? '#475569' : '#9da4c0';
+      const gridColor = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+
+      chartLearned = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Baru', 'Sedang Dipelajari', 'Sudah Dikuasai'],
+          datasets: [{
+            data: [newCards, learning, mature],
+            backgroundColor: ['#06b6d4', '#f59e0b', '#10b981'],
+            borderRadius: 6,
+            maxBarThickness: 34
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { precision: 0, color: textColor },
+              grid: { color: gridColor }
+            },
+            y: {
+              ticks: { color: textColor, font: { weight: '600' } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    function renderHeatmap(reviews) {
+      const grid = document.getElementById('heatmapGrid');
+      const counts = {};
+      reviews.forEach(r => {
+        if (!r.reviewed_at) return;
+        const key = r.reviewed_at.split('T')[0];
+        counts[key] = (counts[key] || 0) + 1;
+      });
+
+      const max = Math.max(1, ...Object.values(counts));
+      let html = '';
+      const now = new Date();
+
+      for (let i = 363; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 86400000);
+        const key = d.toISOString().split('T')[0];
+        const val = counts[key] || 0;
+        let level = 0;
+        if (val > 0) level = Math.min(4, Math.ceil((val / max) * 4));
+        const dateStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+        html += `<div class="heatmap-cell" data-level="${level}" title="${dateStr}: ${val} review"></div>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    function renderStreakCalendar(reviews) {
+      const container = document.getElementById('streakCalendar');
+      const activeDays = new Set();
+      reviews.forEach(r => { if (r.reviewed_at) activeDays.add(r.reviewed_at.split('T')[0]); });
+
+      let html = '';
+      const now = new Date();
+
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 86400000);
+        const key = d.toISOString().split('T')[0];
+        const active = activeDays.has(key);
+        const label = d.getDate();
+        html += `<div style="width:30px; height:30px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; background:${active ? 'var(--accent)' : 'var(--bg-tertiary)'}; color:${active ? '#fff' : 'var(--text-muted)'};" title="${key}">${label}</div>`;
+      }
+      container.innerHTML = html;
+    }
+
+    // --------------------------------------------------------------------------
+    // 12. UTILITIES & MODAL CONTROLS
+    // --------------------------------------------------------------------------
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('active');
+      });
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+      }
+    });
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+      toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span> ${escapeHtml(message)}`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(12px)';
+        toast.style.transition = 'all 0.25s';
+        setTimeout(() => toast.remove(), 250);
+      }, 3200);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function copySQL() {
+      const sql = document.getElementById('sqlSchema').textContent;
+      navigator.clipboard.writeText(sql)
+        .then(() => showToast('Skrip SQL berhasil disalin ke clipboard!', 'success'))
+        .catch(() => showToast('Gagal menyalin otomatis. Silakan salin manual.', 'error'));
+    }
+
+    // Initialize Supabase & session check on page load
+    initSupabase();
+
+    if (!isDemo && supabaseClient) {
+      supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          currentUser = session.user;
+          initializeApp();
+        }
+      });
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user && !currentUser) {
+          currentUser = session.user;
+          initializeApp();
+        } else if (event === 'SIGNED_OUT') {
+          handleLogout();
+        }
+      });
+    }
+  </script>
+</body>
+</html>
