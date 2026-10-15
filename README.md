@@ -2,7 +2,7 @@
 
 Aplikasi web modern berbasis **Supabase** dan **Algoritma SuperMemo 2 (SM-2)** yang dirancang untuk membantu mahasiswa mengingat materi perkuliahan secara optimal dengan teknik pengulangan berkala (*Spaced Repetition System*).
 
-Proyek ini dibangun untuk memenuhi kriteria penugasan UTS:
+- **Pengembang**: Auriel Argi (Branch: feature/sm2-calculator-api v1.1)
 - **No. 15**: Aplikasi Flashcard & Spaced Repetition
 - **Fitur Kunci**: Pembuatan dek belajar, algoritma pengulangan berkala, statistik retensi
 - **Pemanfaatan Fitur Supabase**: PostgreSQL Functions/RPC (perhitungan interval memori), Supabase Auth per pengguna, Row Level Security (RLS)
